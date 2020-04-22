@@ -228,7 +228,26 @@ BR2_PACKAGE_OPTEE_TEST_CROSS_COMPILE ?= $(CROSS_COMPILE_S_USER)
 BR2_PACKAGE_OPTEE_TEST_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
 BR2_PACKAGE_OPTEE_TEST_SITE ?= $(OPTEE_TEST_PATH)
 BR2_PACKAGE_STRACE ?= y
-BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_NW_CONSOLE_UART),ttyAMA$(CFG_NW_CONSOLE_UART),ttyAMA0)
+BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_VIRTUALIZATION), hvc0, \
+	$(if $(CFG_NW_CONSOLE_UART),ttyAMA$(CFG_NW_CONSOLE_UART),ttyAMA0))
+
+ifeq ($(CFG_VIRTUALIZATION),y)
+# add xen config here
+BR2_PACKAGE_XEN_OPTEE ?= y
+BR2_PACKAGE_XEN_OPTEE_TOOLS ?= y
+BR2_PACKAGE_XEN_OPTEE_HYPERVISOR ?= y
+#BR2_ROOTFS_OVERLAY ?= \"$(BUILD_PATH)/br-hikey960-xen-overlay\"
+
+# Xentools require bash
+BR2_PACKAGE_BASH ?= y
+BR2_PACKAGE_BUSYBOX_SHOW_OTHERS ?= y
+# ... and stat
+BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= \"$(BUILD_PATH)/br-ext/busybox.extra\"
+# ... and perl
+BR2_PACKAGE_PERL ?= y
+# ... and with perl it does not fit into 60M of standard rootfs size
+#BR2_TARGET_ROOTFS_EXT2_SIZE ?= \"128M\"
+endif
 
 # All BR2_* variables from the makefile or the environment are appended to
 # ../out-br/extra.conf. All values are quoted "..." except y and n.

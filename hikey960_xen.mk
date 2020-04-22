@@ -13,6 +13,9 @@ CFG_CONSOLE_UART ?= 6
 # Needed by buildroot
 CFG_NW_CONSOLE_UART ?= $(CFG_CONSOLE_UART)
 
+# virtualization
+CFG_VIRTUALIZATION ?= y
+
 # To enable Wi-Fi on HiKey960:
 # 1. Set the network name (SSID) and password in
 #    $(BR2_ROOTFS_OVERLAY)/etc/wpa_supplicant.conf before building
@@ -56,6 +59,8 @@ LLOADER_PATH			?=$(ROOT)/l-loader
 IMAGE_TOOLS_PATH		?=$(ROOT)/tools-images-hikey960
 IMAGE_TOOLS_CONFIG		?=$(OUT_PATH)/config
 PATCHES_PATH			?=$(ROOT)/patches_hikey
+
+XEN_BIN		?= $(ROOT)/out-br/images/xen
 
 ################################################################################
 # Targets
@@ -189,6 +194,12 @@ linux-cleaner: linux-cleaner-common
 ################################################################################
 OPTEE_OS_COMMON_FLAGS += PLATFORM=hikey-hikey960 \
 			CFG_CONSOLE_UART=$(CFG_CONSOLE_UART)
+
+#OPTEE_OS_COMMON_FLAGS += CFG_VIRTUALIZATION=$(CFG_VIRTUALIZATION)
+ifeq ($(CFG_VIRTUALIZATION),y)
+	OPTEE_OS_COMMON_FLAGS += CFG_VIRTUALIZATION=y
+endif
+
 OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=hikey-hikey960
 
 .PHONY: optee-os
@@ -211,7 +222,7 @@ grub-flags := CC="$(CCACHE)gcc" \
 GRUB_MODULES += boot chain configfile echo efinet eval ext2 fat font gettext \
                 gfxterm gzio help linux loadenv lsefi normal part_gpt \
                 part_msdos read regexp search search_fs_file search_fs_uuid \
-                search_label terminal terminfo test tftp time
+                search_label terminal terminfo test tftp time xen_boot
 
 $(GRUB_PATH)/configure: $(GRUB_PATH)/configure.ac
 	cd $(GRUB_PATH) && ./autogen.sh
@@ -262,6 +273,11 @@ boot-img: linux buildroot edk2 grub
 	mcopy -i $(BOOT_IMG) $(GRUBCFG) ::/EFI/BOOT/grub.cfg
 	mcopy -i $(BOOT_IMG) $(ROOT)/out-br/images/rootfs.cpio.gz ::/initrd.img
 	mcopy -i $(BOOT_IMG) $(EDK2_PATH)/Build/HiKey960/$(EDK2_BUILD)_$(EDK2_TOOLCHAIN)/$(EDK2_ARCH)/AndroidFastbootApp.efi ::/EFI/BOOT/fastboot.efi
+
+	# add xen and related images
+	mcopy -i $(BOOT_IMG) $(XEN_BIN) ::/EFI/BOOT/xen.efi
+	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/Image ::/Image.d0
+	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dtb ::/hikey960-d0.dtb
 
 .PHONY: boot-img-clean
 boot-img-clean:
