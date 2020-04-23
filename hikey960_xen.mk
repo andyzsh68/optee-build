@@ -171,7 +171,7 @@ linux-gen_init_cpio: linux-defconfig
 		LOCALVERSION= \
 		gen_init_cpio
 
-LINUX_COMMON_FLAGS += ARCH=arm64 Image hisilicon/hi3660-hikey960.dtb
+LINUX_COMMON_FLAGS += ARCH=arm64 Image hisilicon/hi3660-hikey960.dtb Image.gz
 
 .PHONY: linux
 linux: linux-common
@@ -265,7 +265,7 @@ endif
 boot-img: linux buildroot edk2 grub
 	rm -f $(BOOT_IMG)
 	mformat -i $(BOOT_IMG) -n 64 -h 255 -T 131072 -v "BOOT IMG" -C ::
-	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/Image ::
+	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/Image.gz ::
 	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dtb ::
 	mmd -i $(BOOT_IMG) ::/EFI
 	mmd -i $(BOOT_IMG) ::/EFI/BOOT
@@ -276,7 +276,7 @@ boot-img: linux buildroot edk2 grub
 
 	# add xen and related images
 	mcopy -i $(BOOT_IMG) $(XEN_BIN) ::/EFI/BOOT/xen.efi
-	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/Image ::/Image.d0
+	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/Image.gz ::/Image.gz.d0
 	mcopy -i $(BOOT_IMG) $(LINUX_PATH)/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dtb ::/hikey960-d0.dtb
 
 .PHONY: boot-img-clean
