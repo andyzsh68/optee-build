@@ -8,6 +8,13 @@ override COMPILE_NS_KERNEL := 64
 override COMPILE_S_USER    := 64
 override COMPILE_S_KERNEL  := 64
 
+########################################
+# virtualization, should before include common.mk
+CFG_VIRTUALIZATION ?= y
+# before common
+BR2_PACKAGE_XEN_LOCAL_SITE ?= $(ROOT)/xen
+########################################
+
 ################################################################################
 # If you change this, you MUST run `make arm-tf-clean` first before rebuilding
 ################################################################################
@@ -35,6 +42,7 @@ endif
 EDK2_BIN		?= $(EDK2_PATH)/Build/ArmVirtQemuKernel-$(EDK2_ARCH)/$(EDK2_BUILD)_$(EDK2_TOOLCHAIN)/FV/QEMU_EFI.fd
 QEMU_PATH		?= $(ROOT)/qemu
 SOC_TERM_PATH		?= $(ROOT)/soc_term
+XEN_BIN		?= $(ROOT)/out-br/images/xen
 
 ################################################################################
 # Targets
@@ -163,6 +171,11 @@ linux-cleaner: linux-cleaner-common
 ################################################################################
 OPTEE_OS_COMMON_FLAGS += PLATFORM=vexpress-qemu_armv8a CFG_ARM64_core=y \
 			 DEBUG=$(DEBUG)
+
+ifeq ($(CFG_VIRTUALIZATION),y)
+	OPTEE_OS_COMMON_FLAGS += CFG_VIRTUALIZATION=y
+endif
+
 optee-os: optee-os-common
 
 OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=vexpress-qemu_armv8a

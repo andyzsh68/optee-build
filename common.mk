@@ -230,6 +230,28 @@ BR2_PACKAGE_OPTEE_TEST_SITE ?= $(OPTEE_TEST_PATH)
 BR2_PACKAGE_STRACE ?= y
 BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_NW_CONSOLE_UART),ttyAMA$(CFG_NW_CONSOLE_UART),ttyAMA0)
 
+# Virtualization config
+ifeq ($(CFG_VIRTUALIZATION),y)
+# add xen config here
+#BR2_PACKAGE_XEN_LOCAL ?= y
+BR2_PACKAGE_XEN_LOCAL_TOOLS ?= y
+BR2_PACKAGE_XEN_LOCAL_HYPERVISOR ?= y
+#BR2_ROOTFS_OVERLAY ?= \"$(BUILD_PATH)/br-hikey960-xen-overlay\"
+
+# Xentools require bash
+BR2_PACKAGE_BASH ?= y
+BR2_PACKAGE_BUSYBOX_SHOW_OTHERS ?= y
+# ... and stat
+#BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= \"$(BUILD_PATH)/br-ext/busybox.extra\"
+# ... and perl
+BR2_PACKAGE_PERL ?= y
+# ... and with perl it does not fit into 60M of standard rootfs size
+#BR2_TARGET_ROOTFS_EXT2_SIZE ?= \"128M\"
+
+# buildroot options
+DEFCONFIG_VRITUALIZATION=--br-defconfig build/br-ext/configs/xen_local.conf
+endif
+
 # All BR2_* variables from the makefile or the environment are appended to
 # ../out-br/extra.conf. All values are quoted "..." except y and n.
 double-quote = "#" # This really sets the variable to " and avoids upsetting vim's syntax highlighting
@@ -252,6 +274,7 @@ buildroot: optee-os
 		--br-defconfig build/br-ext/configs/optee_generic \
 		--br-defconfig build/br-ext/configs/$(BUILDROOT_TOOLCHAIN) \
 		$(DEFCONFIG_GDBSERVER) \
+		$(DEFCONFIG_VRITUALIZATION) \
 		--br-defconfig out-br/extra.conf \
 		--make-cmd $(MAKE))
 	@$(MAKE) -C ../out-br all
