@@ -42,7 +42,9 @@ endif
 EDK2_BIN		?= $(EDK2_PATH)/Build/ArmVirtQemuKernel-$(EDK2_ARCH)/$(EDK2_BUILD)_$(EDK2_TOOLCHAIN)/FV/QEMU_EFI.fd
 QEMU_PATH		?= $(ROOT)/qemu
 SOC_TERM_PATH		?= $(ROOT)/soc_term
-XEN_BIN		?= $(ROOT)/out-br/images/xen
+#XEN_BIN		?= $(ROOT)/out-br/images/xen
+XEN_PATH		?= $(ROOT)/out-br/images/xen
+EFI_BOOT_FS		?= $(ROOT)/out-br/images/efi.vfat
 
 ################################################################################
 # Targets
@@ -170,7 +172,7 @@ linux-cleaner: linux-cleaner-common
 # OP-TEE
 ################################################################################
 OPTEE_OS_COMMON_FLAGS += PLATFORM=vexpress-qemu_armv8a CFG_ARM64_core=y \
-			 DEBUG=$(DEBUG)
+			 DEBUG=$(DEBUG) CFG_ARM_GICV3=y
 
 ifeq ($(CFG_VIRTUALIZATION),y)
 	OPTEE_OS_COMMON_FLAGS += CFG_VIRTUALIZATION=y
@@ -191,34 +193,60 @@ soc-term-clean:
 	$(MAKE) -C $(SOC_TERM_PATH) clean
 
 ################################################################################
+# EFI Boot partiotion for Xen
+################################################################################
+.PHONY: efi-partition
+efi-partition:
+	rm -f $(EFI_BOOT_FS)
+	mkfs.vfat -C $(EFI_BOOT_FS) 65536
+	mmd -i $(EFI_BOOT_FS) ::EFI
+	mmd -i $(EFI_BOOT_FS) ::EFI/BOOT
+	mcopy -i $(EFI_BOOT_FS) $(XEN_PATH) ::EFI/BOOT/bootaa64.efi
+	mcopy -i $(EFI_BOOT_FS) $(LINUX_PATH)/arch/arm64/boot/Image ::EFI/BOOT/kernel
+	mcopy -i $(EFI_BOOT_FS) $(ROOT)/out-br/images/rootfs.cpio.gz ::EFI/BOOT/initrd
+	echo "options=console=dtuart noreboot dom0_mem=256M" > $(ROOT)/out-br/images/bootaa64.cfg
+	echo "kernel=kernel console=hvc0" >> $(ROOT)/out-br/images/bootaa64.cfg
+	echo "ramdisk=initrd" >> $(ROOT)/out-br/images/bootaa64.cfg
+	mcopy -i $(EFI_BOOT_FS) $(ROOT)/out-br/images/bootaa64.cfg ::EFI/BOOT/bootaa64.cfg
+
+################################################################################
+# Linux image on BR partiotion
+################################################################################
+buildroot: install-br2-linux
+
+install-br2-linux: linux
+	cp $(LINUX_PATH)/arch/arm64/boot/Image $(ROOT)/build/br-qemu-xen-overlay
+
+################################################################################
 # Run targets
 ################################################################################
 .PHONY: run
 # This target enforces updating root fs etc
-run: all
+run: all efi-partition
 	$(MAKE) run-only
 
-QEMU_SMP ?= 2
+QEMU_SMP ?= 4
 
 .PHONY: run-only
 run-only:
 	ln -sf $(ROOT)/out-br/images/rootfs.cpio.gz $(BINARIES_PATH)/
 	$(call check-terminal)
 	$(call run-help)
-	$(call launch-terminal,54320,"Normal World")
-	$(call launch-terminal,54321,"Secure World")
-	$(call wait-for-ports,54320,54321)
+	$(call launch-terminal,54328,"Normal World")
+	$(call launch-terminal,54329,"Secure World")
+	$(call wait-for-ports,54328,54329)
 	cd $(BINARIES_PATH) && $(QEMU_PATH)/aarch64-softmmu/qemu-system-aarch64 \
 		-nographic \
-		-serial tcp:localhost:54320 -serial tcp:localhost:54321 \
+		-serial tcp:localhost:54328 -serial tcp:localhost:54329 \
 		-smp $(QEMU_SMP) \
 		-s -S -machine virt,secure=on -cpu cortex-a57 \
+		-machine virtualization=true -machine gic-version=3 \
 		-d unimp -semihosting-config enable,target=native \
 		-m 1057 \
 		-bios bl1.bin \
-		-initrd rootfs.cpio.gz \
-		-kernel Image -no-acpi \
-		-append 'console=ttyAMA0,38400 keep_bootcon root=/dev/vda2' \
+		-no-acpi \
+		-drive if=none,file=$(ROOT)/out-br/images/rootfs.ext4,id=hd1,format=raw -device virtio-blk-device,drive=hd1 \
+		-drive if=none,file=$(ROOT)/out-br/images/efi.vfat,id=hd0,format=raw -device virtio-blk-device,drive=hd0 \
 		$(QEMU_EXTRA_ARGS)
 
 ifneq ($(filter check,$(MAKECMDGOALS)),)

@@ -244,11 +244,13 @@ BR2_PACKAGE_XEN_LOCAL_HYPERVISOR ?= y
 BR2_PACKAGE_BASH ?= y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS ?= y
 # ... and stat
-BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= \"$(BUILD_PATH)/br-ext/busybox.extra\"
+BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= "$(BUILD_PATH)/br-ext/busybox.extra"
 # ... and perl
 BR2_PACKAGE_PERL ?= y
 # ... and with perl it does not fit into 60M of standard rootfs size
-#BR2_TARGET_ROOTFS_EXT2_SIZE ?= \"128M\"
+BR2_TARGET_ROOTFS_EXT2 ?= y
+BR2_TARGET_ROOTFS_EXT2_4 ?= y
+BR2_TARGET_ROOTFS_EXT2_SIZE ?= "128M"
 
 # buildroot options
 DEFCONFIG_VRITUALIZATION=--br-defconfig build/br-ext/configs/xen_local.conf
@@ -267,6 +269,7 @@ append-br2-vars = $(foreach var,$(filter BR2_%,$(.VARIABLES)),$(call append-var,
 buildroot: optee-os
 	@mkdir -p ../out-br
 	@rm -f ../out-br/build/optee_*/.stamp_*
+	@rm -f ../out-br/build/xen_*/.stamp_*
 	@rm -f ../out-br/extra.conf
 	@$(call append-br2-vars,../out-br/extra.conf)
 	@(cd .. && python build/br-ext/scripts/make_def_config.py \
