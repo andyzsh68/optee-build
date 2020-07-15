@@ -86,6 +86,7 @@ endif
 ifneq ($(COMPILE_S_KERNEL),)
 OPTEE_OS_COMMON_EXTRA_FLAGS ?= O=out/arm
 OPTEE_OS_BIN		    ?= $(OPTEE_OS_PATH)/out/arm/core/tee.bin
+OPTEE_OS_ELF		    ?= $(OPTEE_OS_PATH)/out/arm/core/tee.elf
 OPTEE_OS_HEADER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-header_v2.bin
 OPTEE_OS_PAGER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pager_v2.bin
 OPTEE_OS_PAGEABLE_V2_BIN    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pageable_v2.bin

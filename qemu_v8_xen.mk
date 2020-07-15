@@ -95,6 +95,9 @@ arm-tf: optee-os edk2
 	ln -sf $(TF_A_OUT)/bl1.bin $(BINARIES_PATH)
 	ln -sf $(TF_A_OUT)/bl2.bin $(BINARIES_PATH)
 	ln -sf $(TF_A_OUT)/bl31.bin $(BINARIES_PATH)
+	ln -sf $(TF_A_OUT)/bl1/bl1.elf $(BINARIES_PATH)
+	ln -sf $(TF_A_OUT)/bl2/bl2.elf $(BINARIES_PATH)
+	ln -sf $(TF_A_OUT)/bl31/bl31.elf $(BINARIES_PATH)
 ifeq ($(TF_A_TRUSTED_BOARD_BOOT),y)
 	ln -sf $(TF_A_OUT)/trusted_key.crt $(BINARIES_PATH)
 	ln -sf $(TF_A_OUT)/tos_fw_key.crt $(BINARIES_PATH)
@@ -106,6 +109,7 @@ ifeq ($(TF_A_TRUSTED_BOARD_BOOT),y)
 	ln -sf $(TF_A_OUT)/nt_fw_content.crt $(BINARIES_PATH)
 endif
 	ln -sf $(OPTEE_OS_HEADER_V2_BIN) $(BINARIES_PATH)/bl32.bin
+	ln -sf $(OPTEE_OS_ELF) $(BINARIES_PATH)/bl32.elf
 	ln -sf $(OPTEE_OS_PAGER_V2_BIN) $(BINARIES_PATH)/bl32_extra1.bin
 	ln -sf $(OPTEE_OS_PAGEABLE_V2_BIN) $(BINARIES_PATH)/bl32_extra2.bin
 	ln -sf $(EDK2_BIN) $(BINARIES_PATH)/bl33.bin
@@ -195,18 +199,20 @@ soc-term-clean:
 ################################################################################
 # EFI Boot partiotion for Xen
 ################################################################################
-.PHONY: efi-partition
-efi-partition:
+.PHONY: boot-img
+boot-img:
 	rm -f $(EFI_BOOT_FS)
 	mkfs.vfat -C $(EFI_BOOT_FS) 65536
 	mmd -i $(EFI_BOOT_FS) ::EFI
 	mmd -i $(EFI_BOOT_FS) ::EFI/BOOT
 	mcopy -i $(EFI_BOOT_FS) $(XEN_PATH) ::EFI/BOOT/bootaa64.efi
 	mcopy -i $(EFI_BOOT_FS) $(LINUX_PATH)/arch/arm64/boot/Image ::EFI/BOOT/kernel
+#	mcopy -i $(EFI_BOOT_FS) $(LINUX_PATH)/arch/arm64/boot/dts/arm/foundation-v8-gicv3-psci.dtb ::EFI/BOOT/qemu.dtb
 	mcopy -i $(EFI_BOOT_FS) $(ROOT)/out-br/images/rootfs.cpio.gz ::EFI/BOOT/initrd
 	echo "options=console=dtuart noreboot dom0_mem=256M" > $(ROOT)/out-br/images/bootaa64.cfg
 	echo "kernel=kernel console=hvc0" >> $(ROOT)/out-br/images/bootaa64.cfg
 	echo "ramdisk=initrd" >> $(ROOT)/out-br/images/bootaa64.cfg
+#	echo "dtb=qemu.dtb" >> $(ROOT)/out-br/images/bootaa64.cfg
 	mcopy -i $(EFI_BOOT_FS) $(ROOT)/out-br/images/bootaa64.cfg ::EFI/BOOT/bootaa64.cfg
 
 ################################################################################
@@ -222,7 +228,7 @@ install-br2-linux: linux
 ################################################################################
 .PHONY: run
 # This target enforces updating root fs etc
-run: all efi-partition
+run: all boot-img
 	$(MAKE) run-only
 
 QEMU_SMP ?= 4
