@@ -17,9 +17,7 @@ OPTEE_CLIENT_EXPORT		?= $(OPTEE_CLIENT_PATH)/out/export
 OPTEE_TEST_PATH			?= $(ROOT)/optee_test
 OPTEE_TEST_OUT_PATH		?= $(ROOT)/optee_test/out
 OPTEE_EXAMPLES_PATH		?= $(ROOT)/optee_examples
-BENCHMARK_APP_PATH		?= $(ROOT)/optee_benchmark
-BENCHMARK_APP_OUT		?= $(BENCHMARK_APP_PATH)/out
-LIBYAML_LIB_OUT			?= $(BENCHMARK_APP_OUT)/libyaml/out/lib
+OPTEE_BENCHMARK_PATH		?= $(ROOT)/optee_benchmark
 BUILDROOT_TARGET_ROOT		?= $(ROOT)/out-br/target
 
 # default high verbosity. slow uarts shall specify lower if prefered
@@ -168,31 +166,6 @@ cc-option = $(strip $(call _cc-option,$(1),$(2),$(3)))
 all:
 
 ################################################################################
-# Busybox
-################################################################################
-BUSYBOX_COMMON_TARGET		?= TOBEDEFINED
-BUSYBOX_CLEAN_COMMON_TARGET	?= TOBEDEFINED
-
-.PHONY: busybox-common
-busybox-common: linux
-	cd $(GEN_ROOTFS_PATH) &&  \
-		CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
-		PATH=${PATH}:$(LINUX_PATH)/usr \
-		$(GEN_ROOTFS_PATH)/generate-cpio-rootfs.sh \
-			$(BUSYBOX_COMMON_TARGET)
-
-.PHONY: busybox-clean-common
-busybox-clean-common:
-	cd $(GEN_ROOTFS_PATH) && \
-	$(GEN_ROOTFS_PATH)/generate-cpio-rootfs.sh  \
-		$(BUSYBOX_CLEAN_COMMON_TARGET)
-
-.PHONY: busybox-cleaner-common
-busybox-cleaner-common:
-	rm -rf $(GEN_ROOTFS_PATH)/build
-	rm -rf $(GEN_ROOTFS_PATH)/filelist-final.txt
-
-################################################################################
 # Build root
 ################################################################################
 BUILDROOT_ARCH=aarch$(COMPILE_NS_USER)
@@ -211,22 +184,22 @@ endif
 BR2_PACKAGE_LIBOPENSSL ?= y
 BR2_PACKAGE_MMC_UTILS ?= y
 BR2_PACKAGE_OPENSSL ?= y
-BR2_PACKAGE_OPTEE_BENCHMARK ?= $(CFG_TEE_BENCHMARK)
-BR2_PACKAGE_OPTEE_BENCHMARK_SITE ?= $(BENCHMARK_APP_PATH)
-BR2_PACKAGE_OPTEE_CLIENT_SITE ?= $(OPTEE_CLIENT_PATH)
-BR2_PACKAGE_OPTEE_EXAMPLES ?= y
-BR2_PACKAGE_OPTEE_EXAMPLES_CROSS_COMPILE ?= $(CROSS_COMPILE_S_USER)
-BR2_PACKAGE_OPTEE_EXAMPLES_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
-BR2_PACKAGE_OPTEE_EXAMPLES_SITE ?= $(OPTEE_EXAMPLES_PATH)
+BR2_PACKAGE_OPTEE_BENCHMARK_EXT ?= $(CFG_TEE_BENCHMARK)
+BR2_PACKAGE_OPTEE_BENCHMARK_EXT_SITE ?= $(BENCHMARK_APP_PATH)
+BR2_PACKAGE_OPTEE_CLIENT_EXT_SITE ?= $(OPTEE_CLIENT_PATH)
+BR2_PACKAGE_OPTEE_EXAMPLES_EXT ?= y
+BR2_PACKAGE_OPTEE_EXAMPLES_EXT_CROSS_COMPILE ?= $(CROSS_COMPILE_S_USER)
+BR2_PACKAGE_OPTEE_EXAMPLES_EXT_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
+BR2_PACKAGE_OPTEE_EXAMPLES_EXT_SITE ?= $(OPTEE_EXAMPLES_PATH)
 # The OPTEE_OS package builds nothing, it just installs files into the
 # root FS when applicable (for example: shared libraries)
-BR2_PACKAGE_OPTEE_OS ?= y
-BR2_PACKAGE_OPTEE_OS_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
-BR2_PACKAGE_OPTEE_OS_SITE ?= $(CURDIR)/br-ext/package/optee_os
-BR2_PACKAGE_OPTEE_TEST ?= y
-BR2_PACKAGE_OPTEE_TEST_CROSS_COMPILE ?= $(CROSS_COMPILE_S_USER)
-BR2_PACKAGE_OPTEE_TEST_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
-BR2_PACKAGE_OPTEE_TEST_SITE ?= $(OPTEE_TEST_PATH)
+BR2_PACKAGE_OPTEE_OS_EXT ?= y
+BR2_PACKAGE_OPTEE_OS_EXT_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
+BR2_PACKAGE_OPTEE_OS_EXT_SITE ?= $(CURDIR)/br-ext/package/optee_os_ext
+BR2_PACKAGE_OPTEE_TEST_EXT ?= y
+BR2_PACKAGE_OPTEE_TEST_EXT_CROSS_COMPILE ?= $(CROSS_COMPILE_S_USER)
+BR2_PACKAGE_OPTEE_TEST_EXT_SDK ?= $(OPTEE_OS_TA_DEV_KIT_DIR)
+BR2_PACKAGE_OPTEE_TEST_EXT_SITE ?= $(OPTEE_TEST_PATH)
 BR2_PACKAGE_STRACE ?= y
 BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_NW_CONSOLE_UART),ttyAMA$(CFG_NW_CONSOLE_UART),ttyAMA0)
 
@@ -383,6 +356,7 @@ endef
 ################################################################################
 OPTEE_OS_COMMON_FLAGS ?= \
 	$(OPTEE_OS_COMMON_EXTRA_FLAGS) \
+	PLATFORM=$(OPTEE_OS_PLATFORM) \
 	CROSS_COMPILE=$(CROSS_COMPILE_S_USER) \
 	CROSS_COMPILE_core=$(CROSS_COMPILE_S_KERNEL) \
 	CROSS_COMPILE_ta_arm64="$(CCACHE)$(AARCH64_CROSS_COMPILE)" \
@@ -395,14 +369,12 @@ OPTEE_OS_COMMON_FLAGS ?= \
 optee-os-common:
 	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_COMMON_FLAGS)
 
-OPTEE_OS_CLEAN_COMMON_FLAGS ?= $(OPTEE_OS_COMMON_EXTRA_FLAGS)
-
 .PHONY: optee-os-clean-common
 ifeq ($(CFG_TEE_BENCHMARK),y)
 optee-os-clean-common: benchmark-app-clean-common
 endif
 optee-os-clean-common: xtest-clean-common optee-examples-clean-common
-	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_CLEAN_COMMON_FLAGS) clean
+	$(MAKE) -C $(OPTEE_OS_PATH) $(OPTEE_OS_COMMON_FLAGS) clean
 
 OPTEE_CLIENT_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 	CFG_TEE_BENCHMARK=$(CFG_TEE_BENCHMARK) \
@@ -476,8 +448,8 @@ BENCHMARK_APP_COMMON_FLAGS ?= CROSS_COMPILE=$(CROSS_COMPILE_NS_USER) \
 
 .PHONY: benchmark-app-common
 benchmark-app-common: optee-os optee-client
-	$(MAKE) -C $(BENCHMARK_APP_PATH) $(BENCHMARK_APP_COMMON_FLAGS)
+	$(MAKE) -C $(OPTEE_BENCHMARK_PATH) $(BENCHMARK_APP_COMMON_FLAGS)
 
 .PHONY: benchmark-app-clean-common
 benchmark-app-clean-common:
-	$(MAKE) -C $(BENCHMARK_APP_PATH) clean
+	$(MAKE) -C $(OPTEE_BENCHMARK_PATH) clean

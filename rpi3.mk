@@ -12,6 +12,8 @@ override COMPILE_S_KERNEL  := 64
 BR2_TARGET_GENERIC_GETTY_PORT ?= ttyS0
 BR2_ROOTFS_POST_BUILD_SCRIPT ?= "board/raspberrypi3-64/post-build.sh"
 
+OPTEE_OS_PLATFORM = rpi3
+
 include common.mk
 
 ################################################################################
@@ -110,17 +112,6 @@ u-boot-defconfig-clean:
 	rm -f $(U-BOOT_PATH)/.config
 
 ################################################################################
-# Busybox
-################################################################################
-BUSYBOX_COMMON_TARGET = rpi3
-BUSYBOX_CLEAN_COMMON_TARGET = rpi3 clean
-
-busybox: busybox-common
-
-busybox-clean: busybox-clean-common
-
-busybox-cleaner: busybox-cleaner-common
-################################################################################
 # Linux kernel
 ################################################################################
 LINUX_DEFCONFIG_COMMON_ARCH := arm64
@@ -148,10 +139,7 @@ linux-cleaner: linux-cleaner-common
 ################################################################################
 # OP-TEE
 ################################################################################
-OPTEE_OS_COMMON_FLAGS += PLATFORM=rpi3
 optee-os: optee-os-common
-
-OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=rpi3
 optee-os-clean: optee-os-clean-common
 
 ################################################################################

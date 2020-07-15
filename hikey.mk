@@ -15,6 +15,8 @@ CFG_SW_CONSOLE_UART ?= 3
 # eMMC flash size: 8 or 4 GB [default 8]
 CFG_FLASH_SIZE ?= 8
 
+OPTEE_OS_PLATFORM = hikey
+
 ################################################################################
 # Includes
 ################################################################################
@@ -191,9 +193,7 @@ linux-cleaner: linux-cleaner-common
 ################################################################################
 # OP-TEE
 ################################################################################
-OPTEE_OS_COMMON_FLAGS += PLATFORM=hikey \
-			CFG_CONSOLE_UART=$(CFG_SW_CONSOLE_UART)
-OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=hikey
+OPTEE_OS_COMMON_FLAGS += CFG_CONSOLE_UART=$(CFG_SW_CONSOLE_UART)
 
 .PHONY: optee-os
 optee-os: optee-os-common
@@ -347,7 +347,7 @@ recovery:
 	@echo
 	$(call flash_help)
 	@echo
-	python $(ROOT)/burn-boot/hisi-idt.py --img1=$(LLOADER_PATH)/recovery.bin
+	$(ROOT)/burn-boot/hisi-idt.py --img1=$(LLOADER_PATH)/recovery.bin
 	fastboot flash loader $(LLOADER_PATH)/l-loader.bin
 	@echo
 	@echo "3. Wait until you see the (UART) message"
@@ -367,7 +367,8 @@ ifneq ($(FROM_RECOVERY),1)
 	@echo
 	$(call flash_help)
 	@echo "3. Wait until you see the (UART) message"
-	@echo "    \"Android Fastboot mode - version x.x Press any key to quit.\""
+	@echo "    \"Android Fastboot mode - version x.x.\""
+	@echo "     Press RETURN or SPACE key to quit.\""
 endif
 	@read -r -p "Then press enter to continue flashing" dummy
 	@echo

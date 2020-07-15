@@ -5,7 +5,7 @@
 
 all: u-boot linux optee-os build-fit buildroot
 clean: linux-clean u-boot-clean optee-os-clean build-fit-clean buildroot-clean
-cleaner: clean prepare-cleaner busybox-cleaner linux-cleaner
+cleaner: clean prepare-cleaner linux-cleaner
 
 include toolchain.mk
 
@@ -55,10 +55,10 @@ linux-cleaner: linux-cleaner-common
 ###############################################################################
 .PHONY: optee-os optee-os-clean optee-client optee-client-clean
 
-OPTEE_OS_COMMON_FLAGS += PLATFORM=$(OPTEE_PLATFORM)
+OPTEE_OS_COMMON_FLAGS += PLATFORM=$(OPTEE_OS_PLATFORM)
 optee-os: optee-os-common
 
-OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=$(OPTEE_PLATFORM)
+OPTEE_OS_CLEAN_COMMON_FLAGS += PLATFORM=$(OPTEE_OS_PLATFORM)
 optee-os-clean: optee-os-clean-common
 
 optee-client: optee-client-common
