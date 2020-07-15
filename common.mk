@@ -233,9 +233,13 @@ BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_VIRTUALIZATION), hvc0, \
 
 ifeq ($(CFG_VIRTUALIZATION),y)
 # add xen config here
-BR2_PACKAGE_XEN_OPTEE ?= y
-BR2_PACKAGE_XEN_OPTEE_TOOLS ?= y
-BR2_PACKAGE_XEN_OPTEE_HYPERVISOR ?= y
+#BR2_PACKAGE_XEN_OPTEE ?= y
+#BR2_PACKAGE_XEN_OPTEE_TOOLS ?= y
+#BR2_PACKAGE_XEN_OPTEE_HYPERVISOR ?= y
+BR2_PACKAGE_XEN_LOCAL ?= y
+BR2_PACKAGE_XEN_LOCAL_TOOLS ?= y
+BR2_PACKAGE_XEN_LOCAL_HYPERVISOR ?= y
+
 #BR2_ROOTFS_OVERLAY ?= \"$(BUILD_PATH)/br-hikey960-xen-overlay\"
 
 # Xentools require bash
@@ -262,6 +266,7 @@ append-br2-vars = $(foreach var,$(filter BR2_%,$(.VARIABLES)),$(call append-var,
 buildroot: optee-os
 	@mkdir -p ../out-br
 	@rm -f ../out-br/build/optee_*/.stamp_*
+	@rm -f ../out-br/build/xen_*/.stamp_*
 	@rm -f ../out-br/extra.conf
 	@$(call append-br2-vars,../out-br/extra.conf)
 	@(cd .. && python build/br-ext/scripts/make_def_config.py \
