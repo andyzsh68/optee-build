@@ -1,0 +1,41 @@
+From 0cfa63425251b3e1d26d475f5a728864dc35967c Mon Sep 17 00:00:00 2001
+From: andyzhang <andyzsh68@gmail.com>
+Date: Fri, 13 Dec 2019 08:23:06 +0800
+Subject: [PATCH 2/2] tee: enable tee config
+
+Signed-off-by: andyzhang <andyzsh68@gmail.com>
+---
+ build.sh                             | 9 +++++++++
+ xen/arch/arm/configs/arm64_defconfig | 2 ++
+ 2 files changed, 11 insertions(+)
+ create mode 100755 build.sh
+ mode change 100644 => 100755 xen/arch/arm/configs/arm64_defconfig
+
+diff --git a/build.sh b/build.sh
+new file mode 100755
+index 0000000..25a368b
+--- /dev/null
++++ b/build.sh
+@@ -0,0 +1,9 @@
++#!/bin/bash
++cd xen
++export CROSS_COMPILE=aarch64-linux-gnu-
++export ARCH=arm64
++export XEN_TARGET_ARCH=arm64
++export XEN_CONFIG_EXPERT=y
++make defconfig
++make -j4
++cp xen.efi ../../optee/xen/
+diff --git a/xen/arch/arm/configs/arm64_defconfig b/xen/arch/arm/configs/arm64_defconfig
+old mode 100644
+new mode 100755
+index e69de29..cc71adb
+--- a/xen/arch/arm/configs/arm64_defconfig
++++ b/xen/arch/arm/configs/arm64_defconfig
+@@ -0,0 +1,2 @@
++CONFIG_TEE=y
++CONFIG_OPTEE=y
+\ No newline at end of file
+-- 
+2.7.4
+

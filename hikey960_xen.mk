@@ -27,6 +27,9 @@ BR2_PACKAGE_WIRELESS_REGDB = y
 
 BR2_ROOTFS_OVERLAY = $(ROOT)/build/br-ext/board/hikey960/overlay
 
+# before common
+BR2_PACKAGE_XEN_LOCAL_SITE ?= $(ROOT)/xen
+
 ################################################################################
 # Includes
 ################################################################################
@@ -61,6 +64,9 @@ IMAGE_TOOLS_CONFIG		?=$(OUT_PATH)/config
 PATCHES_PATH			?=$(ROOT)/patches_hikey
 
 XEN_BIN		?= $(ROOT)/out-br/images/xen
+
+# use openplatform linux kernel, this repo kernel result in panic
+LINUX_PATH			:= $(ROOT)/linux-xen
 
 ################################################################################
 # Targets
