@@ -3,7 +3,7 @@
 # Xen with patches to support OP-TEE
 #
 ################################################################################
-XEN_LOCAL_VERSION = 1.0
+XEN_LOCAL_VERSION = 4.13
 XEN_LOCAL_SOURCE = local
 XEN_LOCAL_SITE = $(BR2_PACKAGE_XEN_LOCAL_SITE)
 XEN_LOCAL_SITE_METHOD = local
@@ -28,7 +28,7 @@ endif
 
 XEN_LOCAL_CONF_OPTS = --disable-ocamltools
 
-XEN_LOCAL_CONF_ENV = PYTHON=$(HOST_DIR)/bin/python2
+XEN_LOCAL_CONF_ENV = PYTHON=$(HOST_DIR)/bin/python2 XEN_CONFIG_EXPERT=y
 XEN_LOCAL_MAKE_ENV = \
 	XEN_TARGET_ARCH=$(XEN_ARCH) \
 	CROSS_COMPILE=$(TARGET_CROSS) \

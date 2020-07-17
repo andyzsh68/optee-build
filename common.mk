@@ -86,6 +86,7 @@ endif
 ifneq ($(COMPILE_S_KERNEL),)
 OPTEE_OS_COMMON_EXTRA_FLAGS ?= O=out/arm
 OPTEE_OS_BIN		    ?= $(OPTEE_OS_PATH)/out/arm/core/tee.bin
+OPTEE_OS_ELF		    ?= $(OPTEE_OS_PATH)/out/arm/core/tee.elf
 OPTEE_OS_HEADER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-header_v2.bin
 OPTEE_OS_PAGER_V2_BIN	    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pager_v2.bin
 OPTEE_OS_PAGEABLE_V2_BIN    ?= $(OPTEE_OS_PATH)/out/arm/core/tee-pageable_v2.bin
@@ -231,6 +232,7 @@ BR2_PACKAGE_STRACE ?= y
 BR2_TARGET_GENERIC_GETTY_PORT ?= $(if $(CFG_VIRTUALIZATION), hvc0, \
 	$(if $(CFG_NW_CONSOLE_UART),ttyAMA$(CFG_NW_CONSOLE_UART),ttyAMA0))
 
+# Virtualization config
 ifeq ($(CFG_VIRTUALIZATION),y)
 # add xen config here
 #BR2_PACKAGE_XEN_OPTEE ?= y
@@ -246,11 +248,16 @@ BR2_PACKAGE_XEN_LOCAL_HYPERVISOR ?= y
 BR2_PACKAGE_BASH ?= y
 BR2_PACKAGE_BUSYBOX_SHOW_OTHERS ?= y
 # ... and stat
-BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= \"$(BUILD_PATH)/br-ext/busybox.extra\"
+BR2_PACKAGE_BUSYBOX_CONFIG_FRAGMENT_FILES ?= "$(BUILD_PATH)/br-ext/busybox.extra"
 # ... and perl
 BR2_PACKAGE_PERL ?= y
 # ... and with perl it does not fit into 60M of standard rootfs size
-#BR2_TARGET_ROOTFS_EXT2_SIZE ?= \"128M\"
+BR2_TARGET_ROOTFS_EXT2 ?= y
+BR2_TARGET_ROOTFS_EXT2_4 ?= y
+BR2_TARGET_ROOTFS_EXT2_SIZE ?= "128M"
+
+# buildroot options
+DEFCONFIG_VRITUALIZATION=--br-defconfig build/br-ext/configs/xen_local.conf
 endif
 
 # All BR2_* variables from the makefile or the environment are appended to
@@ -276,6 +283,7 @@ buildroot: optee-os
 		--br-defconfig build/br-ext/configs/optee_generic \
 		--br-defconfig build/br-ext/configs/$(BUILDROOT_TOOLCHAIN) \
 		$(DEFCONFIG_GDBSERVER) \
+		$(DEFCONFIG_VRITUALIZATION) \
 		--br-defconfig out-br/extra.conf \
 		--make-cmd $(MAKE))
 	@$(MAKE) -C ../out-br all
