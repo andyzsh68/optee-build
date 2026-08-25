@@ -139,3 +139,49 @@ $(eval $(call build-ts-app,psa-api-test/internal_trusted_storage,$(TS_APP_PSA_IT
 $(eval $(call build-ts-app,psa-api-test/protected_storage,$(TS_APP_PSA_PS_EXTRA_FLAGS)))
 
 clean: ffa-test-all-clean ffa-sp-all-clean
+
+################################################################################
+# F. 跨平台复用同一工作区的陷阱：陈旧的 .config
+################################################################################
+#
+# 本工作区可能先前用于 FVP 构建。u-boot / linux / optee_os 的构建配置**不含
+# 平台标识**，且 make 依时间戳判断新旧 —— 若 FVP 时期生成的 .config 比
+# defconfig 源文件新，make 会**静默沿用它**，编出的镜像在 QEMU 上无法启动。
+#
+# 已实测踩过的坑：u-boot/.config 停留在 FVP 的 CONFIG_SYS_BOARD="vexpress64"，
+# 导致 BL33 是给 FVP 编的 U-Boot，BL31 跳转后立即挂死，
+# 现象是 NW 串口停在 "BL31: v2.14.0" 之后再无输出。
+#
+# 若遇到该现象，先执行：
+#     make -f qemu_v8-psa-sp.mk platform-config-check
+# 确认无误后如需重置：
+#     make -f qemu_v8-psa-sp.mk uboot-defconfig-regen
+#
+.PHONY: platform-config-check
+platform-config-check:
+	@echo "== u-boot =="
+	@if [ -f $(UBOOT_PATH)/.config ]; then \
+		board=$$(sed -n 's/^CONFIG_SYS_BOARD="\(.*\)"/\1/p' $(UBOOT_PATH)/.config); \
+		echo "   CONFIG_SYS_BOARD=$$board"; \
+		if [ "$$board" != "qemu-arm" ]; then \
+			echo "   !! 期望 qemu-arm —— 该配置不是为 QEMU 生成的"; \
+			echo "   !! 请执行: make -f qemu_v8-psa-sp.mk uboot-defconfig-regen"; \
+		else echo "   OK"; fi; \
+	else echo "   (未生成，将在构建时创建)"; fi
+	@echo "== linux =="
+	@if [ -f $(LINUX_PATH)/.config ]; then \
+		if grep -q "^CONFIG_ARM_FFA_TRANSPORT=y" $(LINUX_PATH)/.config && \
+		   grep -q "^CONFIG_ARM_TSTEE=y" $(LINUX_PATH)/.config; then \
+			echo "   ARM_FFA_TRANSPORT / ARM_TSTEE  OK"; \
+		else \
+			echo "   !! 缺少 FF-A 相关配置，请执行: make -f qemu_v8-psa-sp.mk linux-defconfig-clean"; \
+		fi; \
+	else echo "   (未生成，将在构建时创建)"; fi
+
+# 强制重新生成 u-boot 配置（删除后由 u-boot-defconfig 规则重建）
+.PHONY: uboot-defconfig-regen
+uboot-defconfig-regen:
+	rm -f $(UBOOT_PATH)/.config
+	$(MAKE) -f qemu_v8-psa-sp.mk u-boot-defconfig
+	@echo "已重新生成。注意：BL33 变更后需重打 FIP —— 且 TF-A 增量编译可能残留"
+	@echo "其他 SPD 配置的 obj，建议 make -f qemu_v8-psa-sp.mk arm-tf-clean 后重编。"
