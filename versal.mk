@@ -21,9 +21,32 @@ BR2_PACKAGE_OPENSSH_KEY_UTILS ?= y
 # Openssl binary
 BR2_PACKAGE_LIBOPENSSL_BIN ?= y
 
-PLATFORM = versal-vck190
+PLATFORM ?= versal-vck190
+
+VERSAL_UART1 ?=
+VERSAL_UART2ND_OPTEE ?=
+
+ifneq ($(filter versal-net%,$(PLATFORM)),)
+OPTEE_OS_PLATFORM = versal-net
+else
 OPTEE_OS_PLATFORM = versal
+endif
+
 OPTEE_OS_COMMON_EXTRA_FLAGS = CFG_PKCS11_TA=y CFG_USER_TA_TARGET_pkcs11=ta_arm64 O=out/arm
+OPTEE_OS_COMMON_EXTRA_FLAGS += CFG_VERSAL_HUK=n
+
+ifeq ($(VERSAL_UART2ND_OPTEE),y)
+ifneq ($(VERSAL_UART1),y)
+OPTEE_OS_COMMON_EXTRA_FLAGS += CFG_VERSAL_UART1=y
+endif
+else
+ifeq ($(VERSAL_UART1),y)
+OPTEE_OS_COMMON_EXTRA_FLAGS += CFG_VERSAL_UART1=y
+endif
+endif
+
+TF_A_PLAT = $(subst -,_,$(OPTEE_OS_PLATFORM))
+BOOTGEN_ARCH = $(subst -,,$(OPTEE_OS_PLATFORM))
 
 ################################################################################
 # Paths to git projects and various binaries
@@ -34,6 +57,113 @@ BOOTGEN_PATH		?= $(ROOT)/bootgen
 LINUX_PATH		?= $(ROOT)/linux
 
 include common.mk
+
+# for Firmware, if available
+ifeq ($(EMBEDDEDSW_PATH),)
+EMBEDDEDSW_PATH ?= $(wildcard $(ROOT)/embeddedsw)
+endif
+ifneq ($(EMBEDDEDSW_PATH),)
+PLM_APP_PATH := $(EMBEDDEDSW_PATH)/lib/sw_apps/versal_plm
+PLM_SRC_PATH := $(PLM_APP_PATH)/src/$(TF_A_PLAT)
+PLM_PATH_GEN := $(PLM_SRC_PATH)/plm.elf
+PSM_APP_PATH := $(EMBEDDEDSW_PATH)/lib/sw_apps/versal_psmfw
+PSM_SRC_PATH := $(PSM_APP_PATH)/src/$(TF_A_PLAT)
+PSM_PATH_GEN := $(PSM_SRC_PATH)/psmfw.elf
+else
+PLM_PATH_GEN :=
+PSM_PATH_GEN :=
+endif
+
+# for Boot Image(s)
+# BSP_PATH: path to PetaLinux project directory and/or extracted BSP
+# PLM_PATH: path to PLM firmware .elf file, derived from BSP_PATH if available
+# PSM_PATH: path to PSM firmware .elf file, derived from BSP_PATH if available
+# DTB_PATH: path to DeviceTree .dtb file, derived from BSP_PATH if available
+# IUB_PATH: path to U-Boot FIT image .ub file
+
+ifeq ($(BSP_PATH),)
+ifeq ($(OPTEE_OS_PLATFORM),versal-net)
+ifneq ($(wildcard ../versal-net-bsp/.petalinux),)
+BSP_PATH ?= ../versal-net-bsp
+endif
+else
+ifneq ($(wildcard ../versal-bsp/.petalinux),)
+BSP_PATH ?= ../versal-bsp
+endif
+endif
+endif
+
+# backward compat.
+ifeq ($(PLATFORM),versal-vck190)
+BSP_PATH ?= ../versal-vck190-bsp
+endif
+
+ifneq ($(BSP_PATH),)
+$(info Assuming PetaLinux BSP is in $(BSP_PATH))
+PDI_PATH ?= $(wildcard $(BSP_PATH)/project-spec/hw-description/*.pdi)
+ifneq ($(wildcard $(BSP_PATH)/images/linux),)
+PLM_PATH ?= $(wildcard $(BSP_PATH)/images/linux/plm.elf)
+PSM_PATH ?= $(wildcard $(BSP_PATH)/images/linux/psmfw.elf)
+DTB_PATH ?= $(wildcard $(BSP_PATH)/images/linux/system.dtb)
+else
+PLM_PATH ?= $(wildcard $(BSP_PATH)/pre-built/linux/images/plm.elf)
+PSM_PATH ?= $(wildcard $(BSP_PATH)/pre-built/linux/images/psmfw.elf)
+DTB_PATH ?= $(wildcard $(BSP_PATH)/pre-built/linux/images/system.dtb)
+endif
+endif
+
+ifeq ($(OPTEE_OS_PLATFORM),versal-net)
+PDI_PATH ?= $(wildcard ../versal-net-bsp/design.pdi)
+DTB_PATH ?= $(wildcard ../versal-net-bsp/design.dtb)
+else
+PDI_PATH ?= $(wildcard ../versal-bsp/design.pdi)
+DTB_PATH ?= $(wildcard ../versal-bsp/design.dtb)
+endif
+
+# backward compat.
+ifeq ($(PLATFORM),versal-vck190)
+DTB_PATH ?= ../u-boot/arch/arm/dts/versal-vck190-revA-x-ebm-01-revA.dtb
+endif
+ifeq ($(PLATFORM),versal-net-vnx-b2197-revA)
+#DTB_PATH ?= ../u-boot/arch/arm/dts/versal-net-vn-x-b2197-00-revA.dtb
+DTB_PATH ?= ../linux/arch/arm64/boot/dts/xilinx/versal-net-vn-x-b2197-00-revA.dtb
+endif
+
+IUB_PATH ?= versal/$(PLATFORM).ub
+
+ifeq ($(OPTEE_OS_PLATFORM),versal-net)
+IUB_BIF_LOAD ?= 0x27200000
+else
+IUB_BIF_LOAD ?= 0x20000000
+endif
+
+
+_PDI_PATH := $(PDI_PATH)
+ifeq ($(PLM_PATH),generate)
+_PLM_PATH := $(PLM_PATH_GEN)
+else
+_PLM_PATH := $(PLM_PATH)
+endif
+ifeq ($(PSM_PATH),generate)
+_PSM_PATH := $(PSM_PATH_GEN)
+else
+_PSM_PATH := $(PSM_PATH)
+endif
+_DTB_PATH := $(DTB_PATH)
+ifeq ($(IUB_BIF_PATH),)
+_IUB_BIF_PATH := $(IUB_PATH)
+endif
+ifeq ($(IUB_BIF_PATH),n)
+_IUB_BIF_PATH :=
+endif
+_IUB_BIF_LOAD := $(IUB_BIF_LOAD)
+
+ifeq ($(_PDI_PATH);$(findstring image,$(MAKECMDGOALS)),;image)
+$(error PDI_PATH not set, use make PDI_PATH=<path-to-.pdi>)
+endif
+ifeq ($(_DTB_PATH);$(findstring image,$(MAKECMDGOALS)),;image)
+$(error DTB_PATH not set, use make DTB_PATH=<path-to-.dtb>)
+endif
 
 ################################################################################
 # Targets
@@ -49,7 +179,16 @@ include toolchain.mk
 ################################################################################
 
 TF_A_EXPORTS = CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
-TF_A_FLAGS = PLAT=versal VERSAL_CONSOLE=pl011 RESET_TO_BL31=1 SPD=opteed DEBUG=1
+
+TF_A_FLAGS = PLAT=$(TF_A_PLAT) RESET_TO_BL31=1 SPD=opteed DEBUG=1
+ifeq (${VERSAL_UART1},y)
+TF_A_FLAGS += VERSAL_CONSOLE=pl011_1
+else
+TF_A_FLAGS += VERSAL_CONSOLE=pl011
+endif
+ifeq ($(OPTEE_OS_PLATFORM),versal-net)
+TF_A_FLAGS += VERSAL_NET_ATF_MEM_BASE=0x26200000 VERSAL_NET_ATF_MEM_SIZE=0x100000
+endif
 
 tfa:
 	$(TF_A_EXPORTS) $(MAKE) -C $(TF_A_PATH) $(TF_A_FLAGS) bl31
@@ -64,31 +203,60 @@ tfa-clean:
 optee-os: optee-os-common
 
 optee-os-clean: optee-os-clean-common
-	rm -f ${OPTEE_OS_PATH}/out/arm/core/tee_raw.bin
 
 ################################################################################
 # U-Boot
 ################################################################################
 
 U-BOOT_EXPORTS = CROSS_COMPILE="$(CCACHE)$(AARCH64_CROSS_COMPILE)"
-U-BOOT_CONFIG = xilinx_versal_virt_defconfig
-U-BOOT_DTS = versal-vck190-revA
+U-BOOT_CONFIGS = \
+	$(UBOOT_PATH)/configs/xilinx_$(TF_A_PLAT)_virt_defconfig \
+	$(CURDIR)/kconfigs/u-boot_$(TF_A_PLAT).conf
+U-BOOT_BOOTCMD_CONFIG = $(BUILD_PATH)/versal/u-boot_bootcmd.conf
+U-BOOT_DTS = xilinx-$(OPTEE_OS_PLATFORM)-virt
 
-u-boot:
-	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) $(U-BOOT_CONFIG)
+$(U-BOOT_BOOTCMD_CONFIG):
+	truncate -s0 $@
+ifneq ($(_IUB_BIF_PATH),)
+	echo 'CONFIG_BOOTCOMMAND="bootm $(_IUB_BIF_LOAD)"' >>$@
+	echo 'CONFIG_BOOTDELAY=1' >>$@
+endif
+.PHONY: $(U-BOOT_BOOTCMD_CONFIG)
+
+U-BOOT_CONFIGS += $(U-BOOT_BOOTCMD_CONFIG)
+
+$(UBOOT_PATH)/.config: $(U-BOOT_CONFIGS)
+	cd $(UBOOT_PATH) && \
+		$(U-BOOT_EXPORTS) \
+		scripts/kconfig/merge_config.sh $(U-BOOT_CONFIGS)
+
+u-boot-defconfig: $(UBOOT_PATH)/.config
+
+u-boot: u-boot-defconfig
 	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) DEVICE_TREE=$(U-BOOT_DTS) DTC_FLAGS="-@"
 
-u-boot-clean:
+u-boot-defconfig-clean:
+	rm -f $(UBOOT_PATH)/.config
+	rm -f $(U-BOOT_BOOTCMD_CONFIG)
+
+u-boot-clean: u-boot-defconfig-clean
 	$(U-BOOT_EXPORTS) $(MAKE) -C $(U-BOOT_PATH) clean
 
 ###############################################################################
 # Device-Tree
 ###############################################################################
-dtbo: linux
-	${LINUX_PATH}/scripts/dtc/dtc -@ -I dts -O dtb -o versal/versal-optee.dtbo versal/versal-optee.dtso
+%.dtbo: %.dtso linux
+	${LINUX_PATH}/scripts/dtc/dtc -@ -I dts -O dtb -o $@ $<
+
+DTBO_FILES = versal/versal-optee.dtbo
+ifeq ($(OPTEE_OS_PLATFORM),versal)
+dtbo: versal/versal-optee-mem.dtbo
+endif
+
+dtbo: $(DTBO_FILES)
 
 dtbo-clean:
-	rm -f versal/versal-optee.dtbo
+	rm -f $(DTBO_FILES)
 
 ################################################################################
 # Linux kernel
@@ -96,7 +264,7 @@ dtbo-clean:
 
 LINUX_DEFCONFIG_COMMON_ARCH := arm64
 LINUX_DEFCONFIG_COMMON_FILES := \
-		$(LINUX_PATH)/arch/arm64/configs/xilinx_versal_defconfig \
+		$(LINUX_PATH)/arch/arm64/configs/xilinx_$(TF_A_PLAT)_defconfig \
 		$(CURDIR)/kconfigs/versal.conf
 
 linux-defconfig: $(LINUX_PATH)/.config
@@ -116,7 +284,7 @@ LINUX_CLEANER_COMMON_FLAGS += ARCH=arm64
 linux-cleaner: linux-cleaner-common
 
 ###############################################################################
-# Bouildroot
+# Buildroot
 ###############################################################################
 
 BR2_TARGET_GENERIC_ISSUE="OP-TEE embedded distrib for $(PLATFORM)"
@@ -141,15 +309,163 @@ BR2_PACKAGE_OPTEE_BENCHMARK=n
 image: bootimage fitimage
 image-clean: bootimage-clean fitimage-clean
 
+
+###############################################################################
+# Firmware
+###############################################################################
+
+ifneq ($(EMBEDDEDSW_PATH),)
+
+PLM_PARAMS_PATH := $(PLM_APP_PATH)/misc/$(TF_A_PLAT)/xparameters.h
+PLM_PARAMS_BAK_PATH := $(PLM_PARAMS_PATH).bak
+
+ifeq ($(OPTEE_OS_PLATFORM),versal)
+ifeq (${VERSAL_UART1},y)
+PLM_UART_BASEADDR ?= 0xFF010000
+else
+PLM_UART_BASEADDR ?= 0xFF000000
+endif
+else
+# versal-net
+ifeq (${VERSAL_UART1},y)
+PLM_UART_BASEADDR ?= 0xF1930000
+else
+PLM_UART_BASEADDR ?= 0xF1920000
+endif
+endif
+PLM_UART_HIGHADDR := $(shell printf 0x%08X $$(echo $$(($(PLM_UART_BASEADDR) + 0xFFFF))))
+
+$(PLM_PARAMS_BAK_PATH): $(PLM_PARAMS_PATH)
+	# backup original xparameters.h file before modification
+	cp -a $< $@
+	# adjust UART base address
+	sed -i \
+		-e 's#^\(.*\s\+STD\(IN\|OUT\)_BASEADDRESS\)\s\+.*\+$$#\1 $(PLM_UART_BASEADDR)#g' \
+		-e 's#^\(.*\(SBSAUART\|XUARTPSV\)_0_BASEADDR\)\s\+.*$$#\1 $(PLM_UART_BASEADDR)#g' \
+		-e 's#^\(.*\(SBSAUART\|XUARTPSV\)_0_HIGHADDR\)\s\+.*$$#\1 $(PLM_UART_HIGHADDR)#g' \
+		$<
+ifeq ($(OPTEE_OS_PLATFORM),versal)
+	# replace PLM_DEBUG by PLM_PRINT to save space on Versal
+	sed -i -e 's#^\(.*\)\s\+PLM_DEBUG$$#\1 PLM_PRINT#' $<
+	# disable QSPI and OSPI handlers to make room for NVM and PUF handlers on Versal
+	if ! grep -q -e '^.*\s\+PLM_QSPI_EXCLUDE$$' $<; then \
+		sed -i -e '/^.*\s\+XPAR_XILPM_ENABLED$$/a #define PLM_QSPI_EXCLUDE' $<; \
+	fi
+	if ! grep -q -e '^.*\s\+PLM_OSPI_EXCLUDE$$' $<; then \
+		sed -i -e '/^.*\s\+XPAR_XILPM_ENABLED$$/a #define PLM_OSPI_EXCLUDE' $<; \
+	fi
+endif
+	# re-enable NVM and PUF handlers
+	if grep -q -e '^.*\s\+PLM_NVM_EXCLUDE$$' $<; then \
+		sed -i -e '/^.*\s\+PLM_NVM_EXCLUDE$$/d' $<; \
+	fi
+	if grep -q -e '^.*\s\+PLM_PUF_EXCLUDE$$' $<; then \
+		sed -i -e '/^.*\s\+PLM_PUF_EXCLUDE$$/d' $<; \
+	fi
+	# enable ECC curves NIST P256 and P521
+	if ! grep -q -e '^.*\s\+XSECURE_ECC_SUPPORT_NIST_P256$$' $<; then \
+		sed -i -e '/^.*\s\+XPAR_XILPM_ENABLED$$/a #define XSECURE_ECC_SUPPORT_NIST_P256' $<; \
+	fi
+	if ! grep -q -e '^.*\s\+XSECURE_ECC_SUPPORT_NIST_P521$$' $<; then \
+		sed -i -e '/^.*\s\+XPAR_XILPM_ENABLED$$/a #define XSECURE_ECC_SUPPORT_NIST_P521' $<; \
+	fi
+.PHONY: $(PLM_PARAMS_BAK_PATH)
+
+$(PLM_PATH_GEN): $(PLM_PARAMS_BAK_PATH)
+	env PATH=$(PATH):$(shell dirname $(CROSS_COMPILE_FIRMWARE)) \
+		$(MAKE) -C $(PLM_SRC_PATH)/
+	# restore original xparameters.h file to avoid unstaged changes
+	mv $< $(PLM_PARAMS_PATH)
+
+
+ifeq ($(OPTEE_OS_PLATFORM),versal)
+PSM_PARAMS_PATH := $(PSM_APP_PATH)/misc/xparameters.h
+else
+PSM_PARAMS_PATH := $(PSM_APP_PATH)/misc/$(TF_A_PLAT)/xparameters.h
+endif
+PSM_PARAMS_BAK_PATH := $(PSM_PARAMS_PATH).bak
+
+PSM_UART_BASEADDR ?= $(PLM_UART_BASEADDR)
+PSM_UART_HIGHADDR ?= $(PLM_UART_HIGHADDR)
+
+$(PSM_PARAMS_BAK_PATH): $(PSM_PARAMS_PATH)
+	# backup original xparameters.h file before modification
+	cp -a $< $@
+	# adjust UART base address
+	sed -i \
+		-e 's#^\(.*\s\+STD\(IN\|OUT\)_BASEADDRESS\)\s\+.*\+$$#\1 $(PSM_UART_BASEADDR)#g' \
+		-e 's#^\(.*\(SBSAUART\|XUARTPSV\)_0_BASEADDR\)\s\+.*$$#\1 $(PSM_UART_BASEADDR)#g' \
+		-e 's#^\(.*\(SBSAUART\|XUARTPSV\)_0_HIGHADDR\)\s\+.*$$#\1 $(PSM_UART_HIGHADDR)#g' \
+		$<
+.PHONY: $(PSM_PARAMS_BAK_PATH)
+
+$(PSM_PATH_GEN): $(PSM_PARAMS_BAK_PATH)
+	env PATH=$(PATH):$(shell dirname $(CROSS_COMPILE_FIRMWARE)) \
+		$(MAKE) -C $(PSM_SRC_PATH)/
+	# restore original xparameters.h file to avoid unstaged changes
+	mv $< $(PSM_PARAMS_PATH)
+
+firmware: $(PLM_PATH_GEN) $(PSM_PATH_GEN)
+
+firmware-clean:
+	$(MAKE) -C $(PLM_SRC_PATH)/ clean
+	$(MAKE) -C $(PSM_SRC_PATH)/ clean
+	# restore original xparameters.h files to avoid unstaged changes
+	if [ -e $(PLM_PARAMS_BAK_PATH) ]; then \
+		mv $(PLM_PARAMS_BAK_PATH) $(PLM_PARAMS_PATH); \
+	fi
+	if [ -e $(PSM_PARAMS_BAK_PATH) ]; then \
+		mv $(PSM_PARAMS_BAK_PATH) $(PSM_PARAMS_PATH); \
+	fi
+else
+firmware:
+
+firmware-clean:
+
+endif
+
+.PHONY: firmware firmware-clean
+
+
 ###############################################################################
 # Boot Image
 ###############################################################################
 
-bootimage: bootgen tfa optee-os u-boot
-	$(BOOTGEN_PATH)/bootgen -arch versal -image versal/bootImage-${PLATFORM}.bif -w -o versal/BOOT.BIN
+OPTEE_OS_RAWBIN_ELF ?= $(shell dirname $(OPTEE_OS_BIN))/tee-raw.bin.elf
+
+BIF_PATH := versal/bootImage-$(PLATFORM).bif
+
+bif: versal/bootImage-$(OPTEE_OS_PLATFORM).bif.in \
+	$(_PDI_PATH) $(_PLM_PATH) $(_PSM_PATH) $(_DTB_PATH) $(_IUB_BIF_PATH) \
+	optee-os
+	cp -a $< $(BIF_PATH)
+# PLM firmware is optional, if already in .pdi file
+ifeq ($(_PLM_PATH),)
+	sed -i -e '/%PLM_PATH%/d' $(BIF_PATH)
+endif
+# PSM firmware is optional, if already in .pdi file
+ifeq ($(_PSM_PATH),)
+	sed -i -e '/%PSM_PATH%/d' $(BIF_PATH)
+endif
+ifeq ($(_IUB_BIF_PATH),)
+	sed -i -e '/%IUB_PATH%/d' $(BIF_PATH)
+endif
+	sed -i \
+		-e 's#%PDI_PATH%#$(shell realpath -m $(_PDI_PATH))#g' \
+		-e 's#%PLM_PATH%#$(shell realpath -m $(_PLM_PATH) 2>/dev/null)#g' \
+		-e 's#%PSM_PATH%#$(shell realpath -m $(_PSM_PATH) 2>/dev/null)#g' \
+		-e 's#%DTB_PATH%#$(shell realpath -m $(_DTB_PATH))#g' \
+		-e 's#%TEE_PATH%#$(shell realpath -m $(OPTEE_OS_RAWBIN_ELF))#g' \
+		-e 's#%IUB_PATH%#$(shell realpath -m ${_IUB_BIF_PATH} 2>/dev/null)#g' \
+		-e 's#%IUB_LOAD%#$(_IUB_BIF_LOAD)#g' \
+		$(BIF_PATH)
+
+bootimage: bif bootgen tfa optee-os u-boot
+	$(BOOTGEN_PATH)/bootgen -arch $(BOOTGEN_ARCH) -image $(BIF_PATH) -w -o versal/BOOT.BIN
 
 bootimage-clean: bootgen-clean tfa-clean optee-os-clean u-boot-clean
 	rm -f versal/BOOT.BIN
+	rm -f $(BIF_PATH)
 
 
 ###############################################################################
@@ -167,9 +483,23 @@ bootgen-clean:
 # FIT Image
 ###############################################################################
 
-fitimage: linux dtbo buildroot
-	${U-BOOT_PATH}/tools/mkimage -f versal/fitImage-${PLATFORM}.its versal/${PLATFORM}.ub
+_IUB_PATH := $(IUB_PATH)
+
+ITS_PATH := versal/fitImage-$(PLATFORM).its
+
+$(ITS_PATH): versal/fitImage-$(OPTEE_OS_PLATFORM).its.in
+	cp -a $< $@
+	sed -i \
+		-e 's#%DTB_PATH%#$(shell realpath -m $(_DTB_PATH))#g' \
+		$@
+.PHONY: $(ITS_PATH)
+
+$(_IUB_PATH): $(ITS_PATH) u-boot linux dtbo buildroot
+	$(U-BOOT_PATH)/tools/mkimage -f $< $@
+.PHONY: $(_IUB_PATH)
+
+fitimage: $(_IUB_PATH)
 
 fitimage-clean: linux-clean dtbo-clean buildroot-clean
 	rm -f versal/${PLATFORM}.ub
-
+	rm -f versal/fitImage-$(PLATFORM).its

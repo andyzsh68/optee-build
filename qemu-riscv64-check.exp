@@ -1,0 +1,48 @@
+#!/usr/bin/expect -f
+#
+# Start QEMU for the RISC-V OP-TEE setup, boot Linux, and run xtest.
+# This script currently targets the single-console setup used by qemu_riscv64.
+
+set quiet 0
+set xtest_args ""
+set tests "xtest"
+
+# Keep the default high enough for slow hosts and longer xtest cases.
+set timeout 900
+set basedir [file dirname $argv0]
+source $basedir/qemu-check-common.exp
+parse_common_args
+
+if {$tests != "xtest" && $tests != "all"} {
+	fail_with_message "Unsupported test set '$tests' for qemu_riscv64 check" 3
+}
+
+set cmd "xtest $xtest_args"
+
+log_user 0
+log_file -a -noappend "serial0.log"
+# Keep serial1.log present so existing dump logic can show an empty file.
+close [open "serial1.log" "w+"]
+
+info "Starting QEMU..."
+spawn sh -c "$::env(QEMU) $::env(QEMU_CHECK_ARGS)"
+
+expect {
+	"Kernel panic" {
+		fail_with_message "!!! Kernel panic" 1
+	}
+	timeout {
+		fail_with_message "!!! Timeout" 1
+	}
+	"ogin:"
+}
+
+send -- "root\r\r"
+expect "# "
+info " done, guest is booted.\n"
+
+if {$tests == "all" || $tests == "xtest"} {
+	info "Running: $cmd...\n"
+	send -- "$cmd\r"
+	check_test_result
+}
