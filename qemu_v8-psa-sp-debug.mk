@@ -1,0 +1,18 @@
+DEBUG ?= 1
+TF_A_DEBUG ?= 1
+TF_A_LOGLVL ?= 40
+CFG_TEE_CORE_LOG_LEVEL ?= 3
+
+QEMU_GDB_ARGS ?= -gdb tcp:127.0.0.1:4321 -S
+QEMU_NW_PORT ?= 56320
+QEMU_SW_PORT ?= 56321
+
+SP_COMMON_FLAGS += -DCMAKE_BUILD_TYPE=Debug -DTRACE_LEVEL=TRACE_LEVEL_DEBUG
+TS_APP_COMMON_FLAGS += -DCMAKE_BUILD_TYPE=Debug
+
+include qemu_v8-psa-sp.mk
+
+OPTEE_OS_COMMON_EXTRA_FLAGS += CFG_CORE_ASLR=n CFG_TEE_CORE_DEBUG=y
+LINUX_DEFCONFIG_COMMON_FILES += $(CURDIR)/kconfigs/qemu_trusted-services_debug.conf
+
+$(LINUX_PATH)/.config: $(CURDIR)/kconfigs/qemu_trusted-services_debug.conf

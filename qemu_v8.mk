@@ -712,7 +712,8 @@ endif
 
 QEMU_RUN_ARGS = $(QEMU_BASE_ARGS) $(QEMU_SCMI_ARGS)
 QEMU_RUN_ARGS += $(QEMU_RUN_ARGS_COMMON)
-QEMU_RUN_ARGS += -s -S -serial tcp:127.0.0.1:$(QEMU_NW_PORT) -serial tcp:127.0.0.1:$(QEMU_SW_PORT) 
+QEMU_GDB_ARGS ?= -s -S
+QEMU_RUN_ARGS += $(QEMU_GDB_ARGS) -serial tcp:127.0.0.1:$(QEMU_NW_PORT) -serial tcp:127.0.0.1:$(QEMU_SW_PORT)
 
 .PHONY: run-only
 run-only:
